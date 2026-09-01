@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "revenuecat",
-    "slug": "revenuecat",
+    "name": "Promptside",
+    "slug": "promptside",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -12,9 +12,11 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.promptside.app"
     },
     "android": {
+      "package": "com.promptside.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -25,6 +27,22 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-dev-client",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow Promptside to hear questions during Live Q&A.",
+          "speechRecognitionPermission": "Allow Promptside to transcribe questions during Live Q&A.",
+          "androidSpeechServicePackages": [
+            "com.google.android.as",
+            "com.google.android.tts",
+            "com.google.android.googlequicksearchbox"
+          ]
+        }
+      ],
+      "expo-asset"
+    ]
   }
 }
