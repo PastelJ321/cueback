@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 
 export type ListeningState = 'idle' | 'requesting' | 'listening' | 'stopping';
+export type SpeechRecognitionMode = 'on-device' | 'system-service';
 
 function friendlyError(code: ExpoSpeechRecognitionErrorCode, message?: string): string {
   switch (code) {
@@ -30,6 +31,13 @@ export function useSpeechRecognition(contextualStrings: string[]) {
   const [error, setError] = useState<string | null>(null);
   const [needsOfflineModel, setNeedsOfflineModel] = useState(false);
   const [modelDownloadMessage, setModelDownloadMessage] = useState<string | null>(null);
+  const [onDeviceRecognitionSupported, setOnDeviceRecognitionSupported] = useState(
+    ExpoSpeechRecognitionModule.supportsOnDeviceRecognition(),
+  );
+  const [englishLocaleSupported, setEnglishLocaleSupported] = useState<boolean | null>(null);
+  const [recognitionMode, setRecognitionMode] = useState<SpeechRecognitionMode>(
+    ExpoSpeechRecognitionModule.supportsOnDeviceRecognition() ? 'on-device' : 'system-service',
+  );
 
   useSpeechRecognitionEvent('start', () => setState('listening'));
   useSpeechRecognitionEvent('result', (event) => {
@@ -64,6 +72,41 @@ export function useSpeechRecognition(contextualStrings: string[]) {
     }
   }, []);
 
+  const inspectRecognitionCapabilities = useCallback(async () => {
+    const supportsOnDevice = ExpoSpeechRecognitionModule.supportsOnDeviceRecognition();
+    setOnDeviceRecognitionSupported(supportsOnDevice);
+    setRecognitionMode(supportsOnDevice ? 'on-device' : 'system-service');
+
+    try {
+      const locales = await ExpoSpeechRecognitionModule.getSupportedLocales({});
+      const supportsEnglish = locales.locales.some((locale) => {
+        const normalized = locale.toLowerCase();
+        return normalized === 'en-us' || normalized.startsWith('en_') || normalized.startsWith('en-');
+      });
+      setEnglishLocaleSupported(supportsEnglish);
+      if (!supportsEnglish) {
+        throw new Error('The active Apple Speech recognizer does not report support for English (en-US).');
+      }
+    } catch (caught) {
+      if (Platform.OS === 'ios') throw caught;
+    }
+
+    if (__DEV__) {
+      console.info(
+        `[Promptside Speech] locale=en-US, onDevice=${supportsOnDevice}, platform=${Platform.OS}`,
+      );
+    }
+    return supportsOnDevice;
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    void inspectRecognitionCapabilities().catch((caught: unknown) => {
+      setEnglishLocaleSupported(false);
+      setError(caught instanceof Error ? caught.message : 'Couldn’t inspect Apple Speech capabilities.');
+    });
+  }, [inspectRecognitionCapabilities]);
+
   const start = useCallback(async () => {
     setError(null);
     setTranscript('');
@@ -77,20 +120,20 @@ export function useSpeechRecognition(contextualStrings: string[]) {
       return;
     }
 
-    const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
-    if (!permission.granted) {
-      setState('idle');
-      setError('Microphone or speech recognition permission was denied. Enable it in system settings.');
-      return;
-    }
-
-    const canRunOnDevice = ExpoSpeechRecognitionModule.supportsOnDeviceRecognition();
-    if (!(await ensureAndroidOfflineEnglish())) {
-      setState('idle');
-      return;
-    }
-
     try {
+      const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      if (!permission.granted) {
+        setState('idle');
+        setError('Microphone or speech recognition permission was denied. Enable it in system settings.');
+        return;
+      }
+
+      const canRunOnDevice = await inspectRecognitionCapabilities();
+      if (!(await ensureAndroidOfflineEnglish())) {
+        setState('idle');
+        return;
+      }
+
       ExpoSpeechRecognitionModule.start({
         lang: 'en-US',
         interimResults: true,
@@ -104,7 +147,7 @@ export function useSpeechRecognition(contextualStrings: string[]) {
       setState('idle');
       setError(caught instanceof Error ? caught.message : 'Couldn’t start speech recognition.');
     }
-  }, [contextualStrings, ensureAndroidOfflineEnglish]);
+  }, [contextualStrings, ensureAndroidOfflineEnglish, inspectRecognitionCapabilities]);
 
   const stop = useCallback(() => {
     setState('stopping');
@@ -132,6 +175,7 @@ export function useSpeechRecognition(contextualStrings: string[]) {
 
   return {
     state, transcript, finalTranscript, error, needsOfflineModel, modelDownloadMessage,
+    onDeviceRecognitionSupported, englishLocaleSupported, recognitionMode,
     start, stop, downloadOfflineModel,
   };
 }

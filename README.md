@@ -1,125 +1,168 @@
 # Promptside
 
-Promptside is an Android-first Expo/React Native app for live presentations, interviews, and Q&A. It listens to an English question, finds the closest **user-prepared** question on the device, and displays the answer script the user wrote beforehand.
+Promptside is an iPadOS-first Expo + React Native + TypeScript app for live presentations, interviews, and Q&A. It recognizes an English question, finds the semantically closest question prepared by the user, and displays the exact answer script the user wrote beforehand.
 
-It does **not** generate answers. There is no app server, login, cloud database, API key, paid API, OpenAI API, Google Cloud API, Supabase, Firebase, RevenueCat, advertising, or web app.
+It never generates an answer. There is no app server, login, cloud database, API key, paid API, OpenAI API, Google Cloud API, Supabase, Firebase, RevenueCat, advertising, or web app.
 
-## What works
+## Primary targets
 
-- Create, rename, open, and delete local presentations.
-- Add, edit, and delete expected questions and answer scripts.
-- Persist all presentation data in AsyncStorage on the device.
-- Load a four-question sample presentation.
-- Recognize English speech through the native Android/iOS speech framework.
-- Display interim transcripts while the questioner is speaking.
-- Handle microphone permission, missing speech services, missing Android offline English speech packs, no-speech, and recognition errors.
-- Run `all-MiniLM-L6-v2` locally with ExecuTorch and rank the top three prepared questions by cosine similarity.
-- Cache question embeddings and invalidate the cache when a question changes.
-- Auto-show an answer only for a sufficiently confident match; otherwise require the presenter to pick from the top candidates.
+1. A physical iPad in landscape
+2. iPhone/iOS
+3. Android later, using the retained cross-platform code
+
+The iPad landscape Live Q&A screen keeps status, transcript, confidence, possible matches, best match, and the answer script visible in a stable two-column layout. The Answer Script is the largest visual element. Question Bank also uses a split layout on sufficiently wide screens. Compact widths keep the existing single-column phone flow.
+
+## Existing functionality retained
+
+- Presentation create, rename, select, and delete
+- Expected Question and Answer Script create, edit, and delete
+- AsyncStorage persistence entirely on the device
+- Four-question sample presentation
+- MiniLM cosine-similarity matching, Top 3 candidates, confidence guard, and embedding cache
+- Android config and responsive compact UI
 
 ## Project structure
 
 ```text
 App.tsx                         Navigation and root providers
-index.ts                       Expo entry point and ExecuTorch initialization
+index.ts                       Expo entry and ExecuTorch initialization
 src/
-  components/                  Reusable buttons, inputs, and empty states
-  constants/                   Theme and semantic matching thresholds
+  components/                  Buttons, inputs, Answer panel, match list
+  constants/                   Theme and semantic thresholds
   data/                        Development sample presentation
-  hooks/                       Speech recognition and semantic matcher state
+  hooks/                       Speech, semantic matching, responsive layout
   screens/                     Presentations, Question Bank, Editor, Live Q&A
-  services/                    Embedding cache checks, cosine similarity, Top 3
-  state/                       Local app data and semantic model providers
+  services/                    Cosine similarity, Top 3, embedding cache checks
+  state/                       Local data and semantic model providers
   storage/                     AsyncStorage serialization
   types/                       Data and navigation types
-  utils/                       Local ID helper
-app.json                       Native permissions and config plugins
-eas.json                       Optional Android development APK profile
+app.json                       iOS/Android permissions and native build config
 ```
 
 ## Requirements
 
-- Node.js LTS
 - macOS
-- An Android phone (Android 13+ is recommended for both offline speech and the supported ExecuTorch path)
-- Android Studio, Android SDK/platform tools, and JDK 17 for local Android builds
-- USB debugging enabled on the phone
+- Node.js 20.19 or newer in the Node 20 line
+- Full Xcode 26.2 or newer, not only Command Line Tools
+- CocoaPods 1.15.2 or newer, installed through the normal Xcode/Expo toolchain
+- A physical iPad running iPadOS 17 or newer
+- A USB cable or Xcode-compatible wireless device connection
 
-Expo Go cannot run this app because speech recognition and ExecuTorch contain custom native code. Use an Expo Development Build.
+Expo SDK 55 itself supports iOS 15.1+, but Promptside sets its deployment target to **iOS 17.0** because `react-native-executorch@0.9.3` requires iOS 17 for the on-device MiniLM runtime.
+
+Expo Go cannot run Promptside because Apple Speech integration and ExecuTorch contain custom native code. Use a local Expo Development Build.
 
 ## Install
 
 ```bash
+cd /Users/pastelj/Desktop/mac_project/revenuecat
 npm install
 npm run check
 ```
 
 No environment variables or API keys are required.
 
-## Run on a physical Android phone (local build, recommended)
+## Prepare Xcode and a physical iPad
 
-1. Connect the phone by USB, approve the debugging prompt, and verify it appears:
-
-   ```bash
-   adb devices
-   ```
-
-2. Build and install the native development app. Expo generates the ignored `android/` directory automatically:
+1. Install and launch the full Xcode application once. Accept its license and additional component installation.
+2. If macOS is still pointing at Command Line Tools, select Xcode:
 
    ```bash
-   npm run android
+   sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+   xcodebuild -version
    ```
 
-3. For later JavaScript/TypeScript-only sessions, start Metro and open the already-installed Promptside development app:
+3. In Xcode, open **Settings → Accounts**, add your Apple Account, and confirm that a Personal Team is available.
+4. Connect the iPad to the Mac, unlock it, tap **Trust This Computer**, and let it appear under **Window → Devices and Simulators**.
+5. On the iPad, enable **Settings → Privacy & Security → Developer Mode**. Restart and confirm when prompted.
 
-   ```bash
-   npm start
-   ```
+A free Personal Team is sufficient for local device testing. Free provisioning may require the app to be rebuilt periodically.
 
-Re-run `npm run android` after changing native dependencies or `app.json` plugins.
+## Build and run on the iPad
 
-If the phone cannot reach Metro over Wi-Fi, use USB forwarding:
+With the unlocked iPad connected:
 
 ```bash
-adb reverse tcp:8081 tcp:8081
+npm run ios
+```
+
+This runs:
+
+```bash
+npx expo run:ios --device
+```
+
+Choose the connected iPad when prompted. Expo prebuilds the ignored `ios/` directory, installs Pods, creates a signed debug Development Build, installs it on the iPad, and starts Metro.
+
+If automatic signing cannot choose the Personal Team:
+
+1. Generate/install the native project once with the command above, then open:
+
+   ```bash
+   open ios/Promptside.xcworkspace
+   ```
+
+2. Select the **Promptside** project and **Promptside** target.
+3. Open **Signing & Capabilities**.
+4. Enable **Automatically manage signing**.
+5. Select your **Personal Team**.
+6. If `com.promptside.app` conflicts with another registered identifier, change `ios.bundleIdentifier` in `app.json` to a unique reverse-domain value, regenerate the native project, and try again.
+
+For later TypeScript-only changes, keep the installed Development Build and run:
+
+```bash
 npm start
 ```
 
-## Optional EAS Development Build
+Re-run `npm run ios` after changing native dependencies, permissions, or config plugins.
 
-The local build above does not require an Expo account. If local Android tooling is not available, the included `eas.json` can create an internal development APK:
+## First physical-device test
 
-```bash
-npx eas-cli@latest login
-npx eas-cli@latest build --platform android --profile development
-npm start
-```
+1. Open Promptside in iPad landscape.
+2. Allow both **Microphone** and **Speech Recognition** permissions.
+3. Tap **Load sample presentation**.
+4. Open it and tap **Start Live Q&A**.
+5. Wait for `MINILM READY`. The first run downloads approximately 91 MB once.
+6. Tap **Listen** and say: “What made you decide that this benchmark was suitable?”
+7. Confirm the interim transcript updates while speaking.
+8. Confirm a final transcript, Top 3 matches, match confidence, and the prepared benchmark Answer Script appear.
+9. Also try: “What factors about the client determined how much risk you were willing to take?”
+10. If confidence is too low, verify that the app shows **No confident match** instead of automatically showing an answer.
 
-Install the resulting APK on the phone, then open it while Metro is running. EAS is used only to compile the native development client; the app itself still has no backend or cloud data.
+## Apple speech recognition
 
-## Speech recognition
+`expo-speech-recognition@3.1.3` wraps Apple's `Speech` framework (`SFSpeechRecognizer`) on iOS.
 
-`expo-speech-recognition` uses the operating system's native recognizer. The app requests `RECORD_AUDIO`, recognizes `en-US`, enables interim results, exposes Listen/Stop states, and captures the final transcript.
+- Locale: `en-US`
+- Interim/partial results: enabled
+- Final transcript: captured from the native final-result event
+- Start/Stop: explicit controls
+- Permissions: `NSMicrophoneUsageDescription` and `NSSpeechRecognitionUsageDescription` are generated by the config plugin
+- Unavailable, denied, no-speech, busy, audio-capture, and network errors are shown in the UI
 
-On Android 13+ devices that advertise on-device recognition, Promptside requires an installed offline English speech pack and offers a button that opens the system downloader. On devices without on-device recognition, the system recognizer may be unavailable or may use its own network-backed mode; Promptside never calls a speech API directly and has no speech API key. Recognition quality and exact behavior therefore vary by phone vendor and installed recognition service.
+At runtime Promptside checks:
 
-## Semantic embedding and matching
+1. `isRecognitionAvailable()` for the system recognizer,
+2. `getSupportedLocales()` for English locale availability,
+3. `supportsOnDeviceRecognition()` for Apple's current-device on-device capability.
 
-- Model: `sentence-transformers/all-MiniLM-L6-v2`, exported for ExecuTorch/XNNPACK by Software Mansion.
-- Runtime: `react-native-executorch` with the Expo resource fetcher.
-- Model size: approximately 91 MB; the model and tokenizer are downloaded once from the library's published Hugging Face files and cached in the app's document storage.
-- Inference: completely on-device after the initial model download.
-- Vector size: 384 dimensions.
-- Similarity: cosine similarity between the final speech transcript and every prepared question.
-- Results: the three highest scores are shown.
-- Auto-selection: configured centrally in `src/constants/semantic.ts`. The current threshold is `0.62`, with a minimum `0.05` lead over the second result.
+When on-device recognition is reported as available, the recognition request sets `requiresOnDeviceRecognition: true`. Otherwise it uses the Apple system service and clearly displays **APPLE SPEECH · NETWORK MAY BE USED**. In development, the capability decision is also logged as `[Promptside Speech] ...`.
 
-When a question is created or edited while the model is ready, its embedding is calculated and stored with the local question. If the model was not ready, Live Q&A fills in and saves the missing embedding once. A model/version ID and text hash prevent stale cached vectors from being reused.
+The library's capability method is device-level; the actual `en-US` request remains the final runtime validation. If Apple rejects that on-device locale/request combination, Promptside surfaces the native error and does not use a mock transcript.
 
-Try the sample presentation with paraphrases such as:
+## Semantic embedding and matching on iOS
 
-- “What made you decide that this benchmark was suitable?”
-- “What factors about the client determined how much risk you were willing to take?”
+- Runtime: `react-native-executorch@0.9.3`
+- Model: `sentence-transformers/all-MiniLM-L6-v2`, ExecuTorch/XNNPACK export
+- iOS support: native iOS framework with an iOS 17.0 Pod deployment target
+- Target: real arm64 iPhone/iPad; physical-device testing is required
+- Model size: approximately 91 MB, downloaded once and cached in app document storage
+- Inference: entirely on-device after the initial model download
+- Embedding size: 384 dimensions
+- Ranking: cosine similarity, Top 3
+- Auto-selection: score at least `0.62` and at least `0.05` ahead of second place
+
+Question embeddings are cached locally with a model/version ID and question-text hash. Editing a question invalidates its old vector. The app displays only the Answer Script associated with the selected prepared question.
 
 ## Verification commands
 
@@ -127,24 +170,26 @@ Try the sample presentation with paraphrases such as:
 npm run typecheck
 npm run lint
 npx expo install --check
+npx expo-doctor
 npx expo config --type public
-npx expo export --platform android
+npx expo prebuild --platform ios --no-install
+npx expo export --platform ios
 ```
 
 ## Known limitations
 
-- A real phone is required to validate microphone behavior, the vendor speech recognizer, and native model speed. Expo Go and a plain web browser are not supported.
-- React Native ExecuTorch 0.9 officially targets Android 13+ and the New Architecture. Unsupported Android versions or CPU architectures show a model-unavailable state instead of pretending to match semantically.
-- The first semantic-model use needs internet access to download roughly 91 MB. Later inference is local. Bundling the model would remove that first-run dependency but make the APK much larger.
-- Offline English speech recognition requires the phone vendor's English model. Some Android devices do not ship a compatible on-device recognition service.
-- Similarity scores are ranking signals, not calibrated probabilities. The 62% display is cosine similarity formatted as a percentage; collect real rehearsal utterances before treating the threshold as final.
-- English (`en-US`) is the only configured recognition/matching language in this MVP.
-- AsyncStorage is appropriate for this small text-first MVP but is not encrypted and is not ideal for very large question banks.
-- There is no data export, backup, sync, or recovery if the app is uninstalled.
+- This repository was configured and statically verified in an environment without the full Xcode application, CocoaPods, or a connected iPad. Expo Doctor passed 19/20 checks; the only failed check was the missing CocoaPods 1.15.2+ tool. Native compilation, signing, microphone input, Apple Speech behavior, and MiniLM performance still require the physical-device procedure above.
+- `react-native-executorch` raises the app minimum to iOS/iPadOS 17.0.
+- The first MiniLM load requires internet access. Later embedding inference and similarity matching are local.
+- Apple's on-device Speech availability varies by device, OS version, locale, and downloaded system assets. When unavailable, Apple's system recognizer may use its own network service; Promptside does not call or configure a third-party speech API.
+- Similarity percentages are cosine scores formatted as percentages, not calibrated probabilities.
+- English (`en-US`) is the only configured speech/matching language in this MVP.
+- AsyncStorage is not encrypted and is intended for a small text-first question bank.
+- There is no export, backup, cloud sync, or recovery after uninstall.
 
 ## Recommended next steps
 
-1. Test on the target Android phone and record a small set of real paraphrased questions.
-2. Tune the threshold and second-place margin against false positives from that rehearsal set.
-3. Decide whether to bundle the MiniLM files for guaranteed offline first launch or keep the smaller APK and one-time download.
-4. Add local import/export backup before expanding the data model.
+1. Complete the first physical-iPad test above.
+2. Record real rehearsal paraphrases and tune the threshold/margin against false positives.
+3. Measure first-load MiniLM memory and latency on the exact target iPad model.
+4. Decide whether to bundle MiniLM for a fully offline first launch or retain the smaller app binary and one-time download.

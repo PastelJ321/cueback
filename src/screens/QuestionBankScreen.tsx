@@ -1,24 +1,35 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useLayoutEffect } from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useLayoutEffect, useState } from 'react';
+import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '../components/AppButton';
 import { EmptyState } from '../components/EmptyState';
 import { colors, radius, spacing } from '../constants/theme';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import { useAppData } from '../state/AppDataContext';
+import type { PreparedQuestion } from '../types/models';
 import type { RootStackParamList } from '../types/navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'QuestionBank'>;
 
 export function QuestionBankScreen({ navigation, route }: Props) {
   const { data, deleteQuestion } = useAppData();
+  const { isWide } = useResponsiveLayout();
   const presentation = data.presentations.find((item) => item.id === route.params.presentationId);
   const questions = data.questions.filter((item) => item.presentationId === route.params.presentationId);
+  const [selectedQuestionId, setSelectedQuestionId] = useState<string | null>(questions[0]?.id ?? null);
+  const selectedQuestion = questions.find((item) => item.id === selectedQuestionId) ?? questions[0] ?? null;
 
   useLayoutEffect(() => {
     navigation.setOptions({ title: presentation?.title ?? 'Question Bank' });
   }, [navigation, presentation?.title]);
+
+  useEffect(() => {
+    if (!questions.some((item) => item.id === selectedQuestionId)) {
+      setSelectedQuestionId(questions[0]?.id ?? null);
+    }
+  }, [questions, selectedQuestionId]);
 
   if (!presentation) {
     return <EmptyState title="Presentation not found" body="It may have been deleted from local storage." />;
@@ -31,6 +42,76 @@ export function QuestionBankScreen({ navigation, route }: Props) {
     ]);
   };
 
+  const addQuestion = () => navigation.navigate('QuestionEditor', { presentationId: presentation.id });
+  const editQuestion = (question: PreparedQuestion) => navigation.navigate('QuestionEditor', {
+    presentationId: presentation.id,
+    questionId: question.id,
+  });
+  const startLiveQA = () => navigation.navigate('LiveQA', { presentationId: presentation.id });
+
+  if (isWide) {
+    return (
+      <SafeAreaView edges={['bottom']} style={styles.screen}>
+        <View style={styles.wideContent}>
+          <View style={styles.wideHeader}>
+            <View>
+              <Text style={styles.count}>{questions.length} PREPARED {questions.length === 1 ? 'QUESTION' : 'QUESTIONS'}</Text>
+              <Text style={styles.wideHeading}>Review your question bank before going live.</Text>
+            </View>
+            <View style={styles.wideActions}>
+              <AppButton label="Add question" onPress={addQuestion} style={styles.wideButton} variant="secondary" />
+              <AppButton disabled={questions.length === 0} label="Start Live Q&A" onPress={startLiveQA} style={styles.wideButton} />
+            </View>
+          </View>
+          {questions.length === 0 ? (
+            <EmptyState title="No prepared questions" body="Add the questions you expect and the exact answer scripts you want to see during Q&A." />
+          ) : (
+            <View style={styles.splitLayout}>
+              <View style={styles.listPane}>
+                <FlatList
+                  contentContainerStyle={styles.listContent}
+                  data={questions}
+                  keyExtractor={(item) => item.id}
+                  renderItem={({ item, index }) => (
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => setSelectedQuestionId(item.id)}
+                      style={({ pressed }) => [
+                        styles.listRow,
+                        selectedQuestion?.id === item.id && styles.listRowSelected,
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text style={styles.number}>{String(index + 1).padStart(2, '0')}</Text>
+                      <Text numberOfLines={3} style={styles.listQuestion}>{item.question}</Text>
+                    </Pressable>
+                  )}
+                />
+              </View>
+              <View style={styles.detailPane}>
+                {selectedQuestion ? (
+                  <>
+                    <Text style={styles.detailLabel}>EXPECTED QUESTION</Text>
+                    <Text style={styles.detailQuestion}>{selectedQuestion.question}</Text>
+                    <View style={styles.divider} />
+                    <Text style={styles.detailLabel}>ANSWER SCRIPT</Text>
+                    <ScrollView contentContainerStyle={styles.detailAnswerScroll} style={styles.detailAnswerScroller}>
+                      <Text selectable style={styles.detailAnswer}>{selectedQuestion.answer}</Text>
+                    </ScrollView>
+                    <View style={styles.detailActions}>
+                      <AppButton label="Delete" onPress={() => confirmDelete(selectedQuestion.id)} style={styles.detailButton} variant="danger" />
+                      <AppButton label="Edit question" onPress={() => editQuestion(selectedQuestion)} style={styles.detailButton} />
+                    </View>
+                  </>
+                ) : null}
+              </View>
+            </View>
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView edges={['bottom']} style={styles.screen}>
       <FlatList
@@ -41,8 +122,8 @@ export function QuestionBankScreen({ navigation, route }: Props) {
           <View style={styles.header}>
             <Text style={styles.count}>{questions.length} PREPARED {questions.length === 1 ? 'QUESTION' : 'QUESTIONS'}</Text>
             <View style={styles.buttonRow}>
-              <AppButton label="Add question" onPress={() => navigation.navigate('QuestionEditor', { presentationId: presentation.id })} style={styles.flex} variant="secondary" />
-              <AppButton disabled={questions.length === 0} label="Start Live Q&A" onPress={() => navigation.navigate('LiveQA', { presentationId: presentation.id })} style={styles.flex} />
+              <AppButton label="Add question" onPress={addQuestion} style={styles.flex} variant="secondary" />
+              <AppButton disabled={questions.length === 0} label="Start Live Q&A" onPress={startLiveQA} style={styles.flex} />
             </View>
           </View>
         }
@@ -50,7 +131,7 @@ export function QuestionBankScreen({ navigation, route }: Props) {
         renderItem={({ item, index }) => (
           <Pressable
             accessibilityRole="button"
-            onPress={() => navigation.navigate('QuestionEditor', { presentationId: presentation.id, questionId: item.id })}
+            onPress={() => editQuestion(item)}
             style={({ pressed }) => [styles.card, pressed && styles.pressed]}
           >
             <Text style={styles.number}>{String(index + 1).padStart(2, '0')}</Text>
@@ -84,4 +165,24 @@ const styles = StyleSheet.create({
   answer: { color: colors.muted, fontSize: 14, lineHeight: 21, marginTop: 8 },
   cardActions: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
   edit: { color: colors.accent, fontSize: 13, fontWeight: '700' },
+  wideContent: { alignSelf: 'center', flex: 1, maxWidth: 1240, padding: spacing.lg, width: '100%' },
+  wideHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', gap: spacing.lg, marginBottom: spacing.lg },
+  wideHeading: { color: colors.text, fontSize: 24, fontWeight: '800', lineHeight: 31, marginTop: 6 },
+  wideActions: { flexDirection: 'row', gap: spacing.sm },
+  wideButton: { minWidth: 150 },
+  splitLayout: { flex: 1, flexDirection: 'row', gap: spacing.md, minHeight: 0 },
+  listPane: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, borderWidth: 1, flex: 0.4, overflow: 'hidden' },
+  listContent: { padding: spacing.sm },
+  listRow: { borderColor: 'transparent', borderRadius: radius.sm, borderWidth: 1, flexDirection: 'row', gap: 12, marginBottom: 6, minHeight: 72, padding: 14 },
+  listRowSelected: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
+  listQuestion: { color: colors.text, flex: 1, fontSize: 17, fontWeight: '700', lineHeight: 23 },
+  detailPane: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, borderWidth: 1, flex: 0.6, minWidth: 0, padding: spacing.lg },
+  detailLabel: { color: colors.accent, fontSize: 12, fontWeight: '800', letterSpacing: 1.3 },
+  detailQuestion: { color: colors.text, fontSize: 26, fontWeight: '800', lineHeight: 35, marginTop: 10 },
+  divider: { backgroundColor: colors.border, height: 1, marginVertical: spacing.lg },
+  detailAnswerScroll: { flexGrow: 1 },
+  detailAnswerScroller: { flex: 1 },
+  detailAnswer: { color: colors.text, fontSize: 25, fontWeight: '600', lineHeight: 37, marginTop: 12 },
+  detailActions: { flexDirection: 'row', gap: spacing.sm, justifyContent: 'flex-end', marginTop: spacing.lg },
+  detailButton: { minWidth: 150 },
 });

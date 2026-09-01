@@ -9,12 +9,14 @@ import { AppButton } from '../components/AppButton';
 import { EmptyState } from '../components/EmptyState';
 import { LabeledInput } from '../components/LabeledInput';
 import { colors, radius, spacing } from '../constants/theme';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import { useAppData } from '../state/AppDataContext';
 import type { RootStackParamList } from '../types/navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Presentations'>;
 
 export function PresentationsScreen({ navigation }: Props) {
+  const { isWide } = useResponsiveLayout();
   const { data, createPresentation, renamePresentation, deletePresentation, addSamplePresentation } = useAppData();
   const [modal, setModal] = useState<{ id?: string; title: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -55,9 +57,12 @@ export function PresentationsScreen({ navigation }: Props) {
   return (
     <SafeAreaView edges={['bottom']} style={styles.screen}>
       <FlatList
-        contentContainerStyle={styles.content}
+        columnWrapperStyle={isWide ? styles.column : undefined}
+        contentContainerStyle={[styles.content, isWide && styles.contentWide]}
         data={data.presentations}
+        key={isWide ? 'wide' : 'compact'}
         keyExtractor={(item) => item.id}
+        numColumns={isWide ? 2 : 1}
         ListHeaderComponent={
           <View style={styles.header}>
             <Text style={styles.eyebrow}>PROMPTSIDE</Text>
@@ -72,7 +77,7 @@ export function PresentationsScreen({ navigation }: Props) {
             <Pressable
               accessibilityRole="button"
               onPress={() => navigation.navigate('QuestionBank', { presentationId: item.id })}
-              style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+              style={({ pressed }) => [styles.card, isWide && styles.cardWide, pressed && styles.cardPressed]}
             >
               <View style={styles.cardCopy}>
                 <Text numberOfLines={2} style={styles.cardTitle}>{item.title}</Text>
@@ -117,10 +122,13 @@ export function PresentationsScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.md, paddingBottom: spacing.xl, flexGrow: 1 },
+  contentWide: { alignSelf: 'center', maxWidth: 1120, padding: spacing.lg, width: '100%' },
+  column: { gap: spacing.md },
   header: { gap: spacing.md, marginBottom: spacing.lg },
   eyebrow: { color: colors.accent, fontSize: 12, fontWeight: '800', letterSpacing: 1.8 },
   title: { color: colors.text, fontSize: 27, fontWeight: '800', lineHeight: 35 },
   card: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, borderWidth: 1, marginBottom: 12, padding: spacing.md },
+  cardWide: { flex: 1, minHeight: 145 },
   cardPressed: { opacity: 0.76 },
   cardCopy: { gap: 6 },
   cardTitle: { color: colors.text, fontSize: 18, fontWeight: '700', lineHeight: 24 },

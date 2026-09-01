@@ -2,6 +2,7 @@ import { isAvailable, models, useTextEmbeddings } from 'react-native-executorch'
 import {
   createContext, type PropsWithChildren, useCallback, useContext, useMemo, useState,
 } from 'react';
+import { Platform } from 'react-native';
 
 type SemanticModelValue = {
   isReady: boolean;
@@ -23,7 +24,7 @@ function SemanticEngine({ children, retry }: PropsWithChildren<{ retry: () => vo
     isGenerating: embeddings.isGenerating,
     downloadProgress: embeddings.downloadProgress,
     error: !isAvailable
-      ? 'On-device ExecuTorch is unavailable on this Android version or CPU architecture.'
+      ? `On-device ExecuTorch is unavailable on this ${Platform.OS === 'ios' ? 'iOS device' : 'Android version or CPU architecture'}.`
       : embeddings.error?.message ?? null,
     embed,
     retry,
