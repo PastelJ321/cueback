@@ -36,6 +36,7 @@ src/
   state/                       Local data and semantic model providers
   storage/                     AsyncStorage serialization
   types/                       Data and navigation types
+plugins/                       Persistent Expo native build adjustments
 app.json                       iOS/Android permissions and native build config
 ```
 
