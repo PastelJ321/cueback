@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnswerScriptPanel } from '../components/AnswerScriptPanel';
 import { AppButton } from '../components/AppButton';
+import { AudioLevelMeter } from '../components/AudioLevelMeter';
 import { LiveMatchList } from '../components/LiveMatchList';
 import { colors, radius, spacing } from '../constants/theme';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
@@ -32,10 +33,12 @@ export function LiveQAScreen({ route }: Props) {
       : `${Platform.OS === 'ios' ? 'APPLE SPEECH' : 'SYSTEM SPEECH'} · NETWORK MAY BE USED`;
 
   useEffect(() => {
-    if (speech.finalTranscript && matcher.isReady) void matcher.match(speech.finalTranscript);
-    // Match only after a new final transcript, or when the local model finishes loading.
+    if (speech.state === 'idle' && speech.finalTranscript && matcher.isReady) {
+      void matcher.match(speech.finalTranscript);
+    }
+    // Match after the user stops (or the recognizer ends), not on an early iOS final-like segment.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [speech.finalTranscript, matcher.isReady]);
+  }, [speech.finalTranscript, speech.state, matcher.isReady]);
 
   const handleListen = () => {
     if (active) {
@@ -92,6 +95,7 @@ export function LiveQAScreen({ route }: Props) {
             <View style={styles.wideLeftColumn}>
               <View style={styles.transcriptCard}>
                 <Text style={styles.sectionLabel}>DETECTED QUESTION</Text>
+                <AudioLevelMeter active={speech.state === 'listening'} compact level={speech.audioLevel} />
                 <Text style={[styles.wideTranscript, !speech.transcript && styles.placeholderTranscript]}>
                   {speech.transcript
                     ? `“${speech.transcript}”`
@@ -100,7 +104,11 @@ export function LiveQAScreen({ route }: Props) {
                       : 'Tap Listen when the question begins.'}
                 </Text>
                 <Text style={styles.transcriptState}>
-                  {active ? 'Interim transcript updates live' : speech.finalTranscript ? 'Final transcript captured' : 'English · en-US'}
+                  {active
+                    ? 'Listening stays active until you tap Stop'
+                    : speech.finalTranscript
+                      ? 'Final transcript captured'
+                      : 'Speech input: English (en-US) · Korean→English translation is not enabled'}
                 </Text>
               </View>
               {matcher.isMatching ? (
@@ -163,6 +171,7 @@ export function LiveQAScreen({ route }: Props) {
         ) : null}
         <View style={[styles.center, speech.finalTranscript ? styles.centerCompact : undefined]}>
           <Text style={styles.heading}>{active ? 'Listening…' : speech.finalTranscript ? 'Question captured' : 'Ready for the next question?'}</Text>
+          <AudioLevelMeter active={speech.state === 'listening'} level={speech.audioLevel} />
           <Text style={[styles.body, speech.transcript && styles.transcript]}>
             {speech.transcript ? `“${speech.transcript}”` : 'Tap Listen, then keep the device where it can clearly hear the questioner.'}
           </Text>
@@ -179,6 +188,7 @@ export function LiveQAScreen({ route }: Props) {
             <AppButton label="Download English speech pack" onPress={() => void speech.downloadOfflineModel()} variant="secondary" />
           ) : null}
           {speech.modelDownloadMessage ? <Text style={styles.downloadMessage}>{speech.modelDownloadMessage}</Text> : null}
+          <Text style={styles.languageNote}>Speech input: English (en-US) · Korean→English translation is not enabled</Text>
         </View>
         {matcher.isMatching ? (
           <View style={styles.matchingCard}>
@@ -219,7 +229,7 @@ const styles = StyleSheet.create({
   modelBody: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: 3 },
   modelErrorCard: { backgroundColor: colors.dangerSoft, borderRadius: radius.md, gap: 8, padding: spacing.md },
   modelErrorTitle: { color: colors.danger, fontSize: 16, fontWeight: '800' },
-  center: { alignItems: 'center', flex: 1, justifyContent: 'center', minHeight: 330, paddingHorizontal: spacing.md },
+  center: { alignItems: 'center', flex: 1, gap: spacing.md, justifyContent: 'center', minHeight: 330, paddingHorizontal: spacing.md },
   centerCompact: { flex: 0, minHeight: 0, paddingBottom: spacing.md, paddingTop: spacing.md },
   heading: { color: colors.text, fontSize: 29, fontWeight: '800', lineHeight: 36, textAlign: 'center' },
   body: { color: colors.muted, fontSize: 16, lineHeight: 24, marginTop: 12, textAlign: 'center' },
@@ -228,6 +238,7 @@ const styles = StyleSheet.create({
   listenButtonCompact: { borderRadius: radius.sm, height: 54, marginTop: spacing.md, width: 150 },
   error: { color: colors.danger, fontSize: 14, lineHeight: 20, textAlign: 'center' },
   downloadMessage: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: spacing.sm, textAlign: 'center' },
+  languageNote: { color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: 'center' },
   matchingCard: { alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md, flexDirection: 'row', gap: 10, justifyContent: 'center', padding: spacing.md },
   matchingText: { color: colors.muted, fontSize: 14, fontWeight: '600' },
   note: { borderTopColor: colors.border, borderTopWidth: 1, marginTop: spacing.md, paddingVertical: spacing.md },
@@ -243,9 +254,9 @@ const styles = StyleSheet.create({
   wideError: { color: colors.danger, fontSize: 13, fontWeight: '600', marginTop: 6, textAlign: 'right' },
   wideMain: { flex: 1, flexDirection: 'row', gap: spacing.md, marginTop: spacing.md, minHeight: 0 },
   wideLeftColumn: { flex: 0.62, gap: spacing.md, minWidth: 0 },
-  transcriptCard: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, borderWidth: 1, minHeight: 174, padding: spacing.lg },
+  transcriptCard: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, borderWidth: 1, gap: 12, minHeight: 210, padding: spacing.lg },
   sectionLabel: { color: colors.accent, fontSize: 12, fontWeight: '800', letterSpacing: 1.4 },
-  wideTranscript: { color: colors.text, fontSize: 25, fontWeight: '700', lineHeight: 34, marginTop: 12 },
+  wideTranscript: { color: colors.text, fontSize: 25, fontWeight: '700', lineHeight: 34 },
   placeholderTranscript: { color: colors.muted, fontWeight: '600' },
   transcriptState: { color: colors.muted, fontSize: 12, marginTop: 'auto', paddingTop: 12 },
   wideFooter: { color: colors.muted, fontSize: 11, paddingTop: 8, textAlign: 'right' },

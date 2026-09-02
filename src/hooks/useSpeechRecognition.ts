@@ -3,7 +3,7 @@ import {
   useSpeechRecognitionEvent,
   type ExpoSpeechRecognitionErrorCode,
 } from 'expo-speech-recognition';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 
 export type ListeningState = 'idle' | 'requesting' | 'listening' | 'stopping';
@@ -29,6 +29,7 @@ export function useSpeechRecognition(contextualStrings: string[]) {
   const [transcript, setTranscript] = useState('');
   const [finalTranscript, setFinalTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [audioLevel, setAudioLevel] = useState(-2);
   const [needsOfflineModel, setNeedsOfflineModel] = useState(false);
   const [modelDownloadMessage, setModelDownloadMessage] = useState<string | null>(null);
   const [onDeviceRecognitionSupported, setOnDeviceRecognitionSupported] = useState(
@@ -38,19 +39,45 @@ export function useSpeechRecognition(contextualStrings: string[]) {
   const [recognitionMode, setRecognitionMode] = useState<SpeechRecognitionMode>(
     ExpoSpeechRecognitionModule.supportsOnDeviceRecognition() ? 'on-device' : 'system-service',
   );
+  const completedTranscriptRef = useRef('');
+  const latestTranscriptRef = useRef('');
 
   useSpeechRecognitionEvent('start', () => setState('listening'));
   useSpeechRecognitionEvent('result', (event) => {
     const next = event.results[0]?.transcript.trim() ?? '';
-    if (next) setTranscript(next);
-    if (event.isFinal && next) setFinalTranscript(next);
+    if (!next) return;
+
+    if (Platform.OS === 'ios') {
+      const combined = [completedTranscriptRef.current, next].filter(Boolean).join(' ').trim();
+      latestTranscriptRef.current = combined;
+      setTranscript(combined);
+      if (event.isFinal) {
+        completedTranscriptRef.current = combined;
+        setFinalTranscript(combined);
+      }
+      return;
+    }
+
+    latestTranscriptRef.current = next;
+    setTranscript(next);
+    if (event.isFinal) {
+      completedTranscriptRef.current = next;
+      setFinalTranscript(next);
+    }
   });
+  useSpeechRecognitionEvent('volumechange', (event) => setAudioLevel(event.value));
   useSpeechRecognitionEvent('nomatch', () => setError('No clear speech was recognized. Please try again.'));
   useSpeechRecognitionEvent('error', (event) => {
     const next = friendlyError(event.error, event.message);
     if (next) setError(next);
+    setAudioLevel(-2);
   });
-  useSpeechRecognitionEvent('end', () => setState('idle'));
+  useSpeechRecognitionEvent('end', () => {
+    const latest = latestTranscriptRef.current.trim();
+    if (latest) setFinalTranscript((current) => latest.length > current.length ? latest : current);
+    setAudioLevel(-2);
+    setState('idle');
+  });
 
   useEffect(() => () => {
     ExpoSpeechRecognitionModule.abort();
@@ -111,6 +138,9 @@ export function useSpeechRecognition(contextualStrings: string[]) {
     setError(null);
     setTranscript('');
     setFinalTranscript('');
+    setAudioLevel(-2);
+    completedTranscriptRef.current = '';
+    latestTranscriptRef.current = '';
     setModelDownloadMessage(null);
     setState('requesting');
 
@@ -138,10 +168,15 @@ export function useSpeechRecognition(contextualStrings: string[]) {
         lang: 'en-US',
         interimResults: true,
         maxAlternatives: 1,
-        continuous: false,
+        continuous: Platform.OS === 'ios',
         requiresOnDeviceRecognition: canRunOnDevice,
         addsPunctuation: canRunOnDevice,
         contextualStrings: contextualStrings.slice(0, 50),
+        iosTaskHint: 'dictation',
+        volumeChangeEventOptions: {
+          enabled: true,
+          intervalMillis: 100,
+        },
       });
     } catch (caught) {
       setState('idle');
@@ -174,7 +209,7 @@ export function useSpeechRecognition(contextualStrings: string[]) {
   }, []);
 
   return {
-    state, transcript, finalTranscript, error, needsOfflineModel, modelDownloadMessage,
+    state, transcript, finalTranscript, audioLevel, error, needsOfflineModel, modelDownloadMessage,
     onDeviceRecognitionSupported, englishLocaleSupported, recognitionMode,
     start, stop, downloadOfflineModel,
   };
