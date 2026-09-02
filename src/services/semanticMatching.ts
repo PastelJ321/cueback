@@ -9,11 +9,13 @@ import type { PreparedQuestion } from '../types/models';
 export type SemanticMatch = {
   question: PreparedQuestion;
   score: number;
+  transcript: string;
 };
 
 export type MatchResult = {
   matches: SemanticMatch[];
   confidentQuestionId: string | null;
+  matchedTranscript: string;
   embeddingsToCache: { id: string; embedding: number[]; embeddingTextHash: string }[];
 };
 
@@ -50,11 +52,13 @@ export function cosineSimilarity(left: readonly number[], right: readonly number
 }
 
 export async function findSemanticMatches(
-  transcript: string,
+  transcripts: string[],
   questions: PreparedQuestion[],
   embed: (text: string) => Promise<number[]>,
 ): Promise<MatchResult> {
-  const transcriptEmbedding = await embed(transcript);
+  const candidates = [...new Set(transcripts.map((item) => item.trim()).filter(Boolean))].slice(0, 3);
+  if (candidates.length === 0) throw new Error('No speech transcript was available for matching.');
+  const transcriptEmbeddings = await Promise.all(candidates.map((candidate) => embed(candidate)));
   const embeddingsToCache: MatchResult['embeddingsToCache'] = [];
   const scored: SemanticMatch[] = [];
 
@@ -70,7 +74,16 @@ export async function findSemanticMatches(
         embeddingTextHash: hashQuestionText(question.question),
       });
     }
-    scored.push({ question, score: cosineSimilarity(transcriptEmbedding, embedding) });
+    let bestScore = -1;
+    let bestTranscript = candidates[0];
+    transcriptEmbeddings.forEach((transcriptEmbedding, index) => {
+      const score = cosineSimilarity(transcriptEmbedding, embedding);
+      if (score > bestScore) {
+        bestScore = score;
+        bestTranscript = candidates[index];
+      }
+    });
+    scored.push({ question, score: bestScore, transcript: bestTranscript });
   }
 
   const matches = scored.sort((a, b) => b.score - a.score).slice(0, TOP_MATCH_COUNT);
@@ -82,6 +95,7 @@ export async function findSemanticMatches(
   return {
     matches,
     confidentQuestionId: clearsThreshold && hasEnoughMargin ? best.question.id : null,
+    matchedTranscript: best?.transcript ?? candidates[0],
     embeddingsToCache,
   };
 }

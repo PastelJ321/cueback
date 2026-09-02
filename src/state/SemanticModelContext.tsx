@@ -16,7 +16,7 @@ type SemanticModelValue = {
 const SemanticModelContext = createContext<SemanticModelValue | null>(null);
 
 function SemanticEngine({ children, retry }: PropsWithChildren<{ retry: () => void }>) {
-  const model = useMemo(() => models.text_embedding.all_minilm_l6_v2(), []);
+  const model = useMemo(() => models.text_embedding.paraphrase_multilingual_minilm_l12_v2(), []);
   const embeddings = useTextEmbeddings({ model, preventLoad: !isAvailable });
   const embed = useCallback(async (text: string) => Array.from(await embeddings.forward(text)), [embeddings]);
   const value = useMemo<SemanticModelValue>(() => ({

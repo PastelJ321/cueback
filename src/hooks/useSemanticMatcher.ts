@@ -13,31 +13,41 @@ export function useSemanticMatcher(questions: PreparedQuestion[]) {
   const [isMatching, setIsMatching] = useState(false);
   const [matchError, setMatchError] = useState<string | null>(null);
   const [wasAutoSelected, setWasAutoSelected] = useState(false);
+  const [matchedTranscript, setMatchedTranscript] = useState('');
+  const [hasCompletedMatch, setHasCompletedMatch] = useState(false);
 
-  const match = useCallback(async (transcript: string) => {
-    if (!transcript.trim() || questions.length === 0) return;
+  const match = useCallback(async (transcripts: string[]) => {
+    if (!transcripts.some((item) => item.trim())) return;
+    if (questions.length === 0) {
+      setHasCompletedMatch(true);
+      return;
+    }
     if (!semantic.isReady) {
       setMatchError('The semantic model is still loading. Matching will start when it is ready.');
       return;
     }
     setIsMatching(true);
+    setHasCompletedMatch(false);
     setMatchError(null);
     try {
-      const result = await findSemanticMatches(transcript, questions, semantic.embed);
+      const result = await findSemanticMatches(transcripts, questions, semantic.embed);
       setMatches(result.matches);
       setSelectedQuestionId(result.confidentQuestionId);
       setWasAutoSelected(Boolean(result.confidentQuestionId));
+      setMatchedTranscript(result.matchedTranscript);
       await cacheQuestionEmbeddings(result.embeddingsToCache);
     } catch (caught) {
       setMatchError(caught instanceof Error ? caught.message : 'On-device semantic matching failed.');
     } finally {
       setIsMatching(false);
+      setHasCompletedMatch(true);
     }
   }, [cacheQuestionEmbeddings, questions, semantic.embed, semantic.isReady]);
 
   const select = useCallback((questionId: string) => {
     setSelectedQuestionId(questionId);
     setWasAutoSelected(false);
+    setMatchedTranscript('');
   }, []);
 
   const reset = useCallback(() => {
@@ -46,6 +56,8 @@ export function useSemanticMatcher(questions: PreparedQuestion[]) {
     setWasAutoSelected(false);
     setMatchError(null);
     setIsMatching(false);
+    setMatchedTranscript('');
+    setHasCompletedMatch(false);
   }, []);
 
   return {
@@ -56,6 +68,8 @@ export function useSemanticMatcher(questions: PreparedQuestion[]) {
     isMatching,
     matchError,
     wasAutoSelected,
+    matchedTranscript,
+    hasCompletedMatch,
     match,
     select,
     reset,

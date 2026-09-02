@@ -9,6 +9,32 @@ import { Platform } from 'react-native';
 export type ListeningState = 'idle' | 'requesting' | 'listening' | 'stopping';
 export type SpeechRecognitionMode = 'on-device' | 'system-service';
 
+const MAX_TRANSCRIPT_CANDIDATES = 3;
+
+function appendTranscriptSegment(prefix: string, segment: string): string {
+  const cleanPrefix = prefix.trim();
+  const cleanSegment = segment.trim();
+  if (!cleanPrefix) return cleanSegment;
+  if (!cleanSegment) return cleanPrefix;
+
+  const normalizedPrefix = cleanPrefix.toLocaleLowerCase();
+  const normalizedSegment = cleanSegment.toLocaleLowerCase();
+  if (normalizedSegment.startsWith(normalizedPrefix)) return cleanSegment;
+  if (normalizedPrefix.endsWith(normalizedSegment)) return cleanPrefix;
+  return `${cleanPrefix} ${cleanSegment}`;
+}
+
+function combineCandidateSegments(prefixes: string[], segments: string[]): string[] {
+  const count = Math.min(
+    MAX_TRANSCRIPT_CANDIDATES,
+    Math.max(prefixes.length, segments.length),
+  );
+  return Array.from({ length: count }, (_, index) => appendTranscriptSegment(
+    prefixes[index] ?? prefixes[0] ?? '',
+    segments[index] ?? segments[0] ?? '',
+  )).filter(Boolean);
+}
+
 function friendlyError(code: ExpoSpeechRecognitionErrorCode, message?: string): string {
   switch (code) {
     case 'not-allowed': return 'Microphone or speech recognition permission was denied. Enable it in system settings.';
@@ -24,10 +50,11 @@ function friendlyError(code: ExpoSpeechRecognitionErrorCode, message?: string): 
   }
 }
 
-export function useSpeechRecognition(contextualStrings: string[]) {
+export function useSpeechRecognition() {
   const [state, setState] = useState<ListeningState>('idle');
   const [transcript, setTranscript] = useState('');
   const [finalTranscript, setFinalTranscript] = useState('');
+  const [finalTranscriptCandidates, setFinalTranscriptCandidates] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [audioLevel, setAudioLevel] = useState(-2);
   const [needsOfflineModel, setNeedsOfflineModel] = useState(false);
@@ -39,30 +66,35 @@ export function useSpeechRecognition(contextualStrings: string[]) {
   const [recognitionMode, setRecognitionMode] = useState<SpeechRecognitionMode>(
     ExpoSpeechRecognitionModule.supportsOnDeviceRecognition() ? 'on-device' : 'system-service',
   );
-  const completedTranscriptRef = useRef('');
-  const latestTranscriptRef = useRef('');
+  const completedCandidatesRef = useRef<string[]>([]);
+  const latestCandidatesRef = useRef<string[]>([]);
 
   useSpeechRecognitionEvent('start', () => setState('listening'));
   useSpeechRecognitionEvent('result', (event) => {
-    const next = event.results[0]?.transcript.trim() ?? '';
-    if (!next) return;
+    const nextCandidates = event.results
+      .map((result) => result.transcript.trim())
+      .filter(Boolean)
+      .slice(0, MAX_TRANSCRIPT_CANDIDATES);
+    if (nextCandidates.length === 0) return;
 
     if (Platform.OS === 'ios') {
-      const combined = [completedTranscriptRef.current, next].filter(Boolean).join(' ').trim();
-      latestTranscriptRef.current = combined;
-      setTranscript(combined);
+      const combined = combineCandidateSegments(completedCandidatesRef.current, nextCandidates);
+      latestCandidatesRef.current = combined;
+      setTranscript(combined[0] ?? '');
       if (event.isFinal) {
-        completedTranscriptRef.current = combined;
-        setFinalTranscript(combined);
+        completedCandidatesRef.current = combined;
+        setFinalTranscript(combined[0] ?? '');
+        setFinalTranscriptCandidates(combined);
       }
       return;
     }
 
-    latestTranscriptRef.current = next;
-    setTranscript(next);
+    latestCandidatesRef.current = nextCandidates;
+    setTranscript(nextCandidates[0] ?? '');
     if (event.isFinal) {
-      completedTranscriptRef.current = next;
-      setFinalTranscript(next);
+      completedCandidatesRef.current = nextCandidates;
+      setFinalTranscript(nextCandidates[0] ?? '');
+      setFinalTranscriptCandidates(nextCandidates);
     }
   });
   useSpeechRecognitionEvent('volumechange', (event) => setAudioLevel(event.value));
@@ -73,8 +105,11 @@ export function useSpeechRecognition(contextualStrings: string[]) {
     setAudioLevel(-2);
   });
   useSpeechRecognitionEvent('end', () => {
-    const latest = latestTranscriptRef.current.trim();
-    if (latest) setFinalTranscript((current) => latest.length > current.length ? latest : current);
+    const latest = latestCandidatesRef.current;
+    if (latest.length > 0) {
+      setFinalTranscript((current) => (latest[0]?.length ?? 0) > current.length ? latest[0] : current);
+      setFinalTranscriptCandidates((current) => latest[0]?.length > (current[0]?.length ?? 0) ? latest : current);
+    }
     setAudioLevel(-2);
     setState('idle');
   });
@@ -138,9 +173,10 @@ export function useSpeechRecognition(contextualStrings: string[]) {
     setError(null);
     setTranscript('');
     setFinalTranscript('');
+    setFinalTranscriptCandidates([]);
     setAudioLevel(-2);
-    completedTranscriptRef.current = '';
-    latestTranscriptRef.current = '';
+    completedCandidatesRef.current = [];
+    latestCandidatesRef.current = [];
     setModelDownloadMessage(null);
     setState('requesting');
 
@@ -167,11 +203,10 @@ export function useSpeechRecognition(contextualStrings: string[]) {
       ExpoSpeechRecognitionModule.start({
         lang: 'en-US',
         interimResults: true,
-        maxAlternatives: 1,
+        maxAlternatives: MAX_TRANSCRIPT_CANDIDATES,
         continuous: Platform.OS === 'ios',
         requiresOnDeviceRecognition: canRunOnDevice,
         addsPunctuation: canRunOnDevice,
-        contextualStrings: contextualStrings.slice(0, 50),
         iosTaskHint: 'dictation',
         volumeChangeEventOptions: {
           enabled: true,
@@ -182,7 +217,7 @@ export function useSpeechRecognition(contextualStrings: string[]) {
       setState('idle');
       setError(caught instanceof Error ? caught.message : 'Couldn’t start speech recognition.');
     }
-  }, [contextualStrings, ensureAndroidOfflineEnglish, inspectRecognitionCapabilities]);
+  }, [ensureAndroidOfflineEnglish, inspectRecognitionCapabilities]);
 
   const stop = useCallback(() => {
     setState('stopping');
@@ -209,7 +244,8 @@ export function useSpeechRecognition(contextualStrings: string[]) {
   }, []);
 
   return {
-    state, transcript, finalTranscript, audioLevel, error, needsOfflineModel, modelDownloadMessage,
+    state, transcript, finalTranscript, finalTranscriptCandidates, audioLevel,
+    error, needsOfflineModel, modelDownloadMessage,
     onDeviceRecognitionSupported, englishLocaleSupported, recognitionMode,
     start, stop, downloadOfflineModel,
   };

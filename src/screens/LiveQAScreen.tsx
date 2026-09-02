@@ -7,8 +7,10 @@ import { AnswerScriptPanel } from '../components/AnswerScriptPanel';
 import { AppButton } from '../components/AppButton';
 import { AudioLevelMeter } from '../components/AudioLevelMeter';
 import { LiveMatchList } from '../components/LiveMatchList';
+import { QuestionTranslationPanel } from '../components/QuestionTranslationPanel';
 import { colors, radius, spacing } from '../constants/theme';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+import { useOnDeviceTranslation } from '../hooks/useOnDeviceTranslation';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { useSemanticMatcher } from '../hooks/useSemanticMatcher';
 import { useAppData } from '../state/AppDataContext';
@@ -20,8 +22,9 @@ export function LiveQAScreen({ route }: Props) {
   const { data } = useAppData();
   const { isTabletLandscape } = useResponsiveLayout();
   const questions = data.questions.filter((item) => item.presentationId === route.params.presentationId);
-  const speech = useSpeechRecognition(questions.map((item) => item.question));
+  const speech = useSpeechRecognition();
   const matcher = useSemanticMatcher(questions);
+  const translation = useOnDeviceTranslation();
   const active = speech.state === 'listening' || speech.state === 'stopping';
   const modelLoading = !matcher.isReady && !matcher.error;
   const selectedScore = matcher.matches.find((item) => item.question.id === matcher.selectedQuestionId)?.score ?? null;
@@ -34,17 +37,29 @@ export function LiveQAScreen({ route }: Props) {
 
   useEffect(() => {
     if (speech.state === 'idle' && speech.finalTranscript && matcher.isReady) {
-      void matcher.match(speech.finalTranscript);
+      const candidates = speech.finalTranscriptCandidates.length > 0
+        ? speech.finalTranscriptCandidates
+        : [speech.finalTranscript];
+      void matcher.match(candidates);
     }
     // Match after the user stops (or the recognizer ends), not on an early iOS final-like segment.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [speech.finalTranscript, speech.state, matcher.isReady]);
+  }, [speech.finalTranscript, speech.finalTranscriptCandidates, speech.state, matcher.isReady]);
+
+  useEffect(() => {
+    if (speech.state !== 'idle' || !matcher.hasCompletedMatch) return;
+    const sourceText = matcher.matchedTranscript || speech.finalTranscript;
+    if (sourceText) void translation.translate(sourceText);
+    // Wait for semantic reranking so an alternate speech candidate is translated only once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matcher.hasCompletedMatch, matcher.matchedTranscript, speech.finalTranscript, speech.state]);
 
   const handleListen = () => {
     if (active) {
       speech.stop();
     } else {
       matcher.reset();
+      translation.reset();
       void speech.start();
     }
   };
@@ -108,13 +123,23 @@ export function LiveQAScreen({ route }: Props) {
                     ? 'Listening stays active until you tap Stop'
                     : speech.finalTranscript
                       ? 'Final transcript captured'
-                      : 'Speech input: English (en-US) · Korean→English translation is not enabled'}
+                      : 'Speech input: English (en-US) · Korean translation appears after Stop'}
                 </Text>
+                {matcher.matchedTranscript && matcher.matchedTranscript !== speech.finalTranscript ? (
+                  <Text style={styles.alternateTranscript}>
+                    Alternate recognition candidate used for matching: “{matcher.matchedTranscript}”
+                  </Text>
+                ) : null}
               </View>
+              <QuestionTranslationPanel
+                error={translation.error}
+                isTranslating={translation.isTranslating}
+                text={translation.translatedText}
+              />
               {matcher.isMatching ? (
                 <View style={styles.matchingCard}>
                   <ActivityIndicator color={colors.accent} />
-                  <Text style={styles.matchingText}>Comparing meaning on this iPad…</Text>
+                  <Text style={styles.matchingText}>Comparing meaning on this device…</Text>
                 </View>
               ) : null}
               <LiveMatchList
@@ -188,8 +213,19 @@ export function LiveQAScreen({ route }: Props) {
             <AppButton label="Download English speech pack" onPress={() => void speech.downloadOfflineModel()} variant="secondary" />
           ) : null}
           {speech.modelDownloadMessage ? <Text style={styles.downloadMessage}>{speech.modelDownloadMessage}</Text> : null}
-          <Text style={styles.languageNote}>Speech input: English (en-US) · Korean→English translation is not enabled</Text>
+          <Text style={styles.languageNote}>Speech input: English (en-US) · Korean translation runs on this device after Stop</Text>
         </View>
+        {matcher.matchedTranscript && matcher.matchedTranscript !== speech.finalTranscript ? (
+          <View style={styles.alternateCard}>
+            <Text style={styles.alternateLabel}>ALTERNATE RECOGNITION CANDIDATE USED FOR MATCHING</Text>
+            <Text style={styles.alternateBody}>“{matcher.matchedTranscript}”</Text>
+          </View>
+        ) : null}
+        <QuestionTranslationPanel
+          error={translation.error}
+          isTranslating={translation.isTranslating}
+          text={translation.translatedText}
+        />
         {matcher.isMatching ? (
           <View style={styles.matchingCard}>
             <ActivityIndicator color={colors.accent} />
@@ -239,6 +275,9 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, fontSize: 14, lineHeight: 20, textAlign: 'center' },
   downloadMessage: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: spacing.sm, textAlign: 'center' },
   languageNote: { color: colors.muted, fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  alternateCard: { backgroundColor: colors.surfaceMuted, borderRadius: radius.sm, gap: 5, padding: spacing.md },
+  alternateLabel: { color: colors.muted, fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
+  alternateBody: { color: colors.text, fontSize: 14, fontWeight: '600', lineHeight: 21 },
   matchingCard: { alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.md, flexDirection: 'row', gap: 10, justifyContent: 'center', padding: spacing.md },
   matchingText: { color: colors.muted, fontSize: 14, fontWeight: '600' },
   note: { borderTopColor: colors.border, borderTopWidth: 1, marginTop: spacing.md, paddingVertical: spacing.md },
@@ -259,5 +298,6 @@ const styles = StyleSheet.create({
   wideTranscript: { color: colors.text, fontSize: 25, fontWeight: '700', lineHeight: 34 },
   placeholderTranscript: { color: colors.muted, fontWeight: '600' },
   transcriptState: { color: colors.muted, fontSize: 12, marginTop: 'auto', paddingTop: 12 },
+  alternateTranscript: { color: colors.accent, fontSize: 12, fontWeight: '600', lineHeight: 18 },
   wideFooter: { color: colors.muted, fontSize: 11, paddingTop: 8, textAlign: 'right' },
 });
