@@ -65,7 +65,7 @@ export function PresentationsScreen({ navigation }: Props) {
         numColumns={isWide ? 2 : 1}
         ListHeaderComponent={
           <View style={styles.header}>
-            <Text style={styles.eyebrow}>PROMPTSIDE</Text>
+            <Text style={styles.eyebrow}>CUEBACK</Text>
             <Text style={styles.title}>Your prepared answers, ready when the question lands.</Text>
             <AppButton label="New presentation" onPress={() => setModal({ title: '' })} />
           </View>

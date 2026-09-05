@@ -3,7 +3,7 @@ import { useCallback, useRef, useState } from 'react';
 import {
   isOnDeviceTranslationAvailable,
   translateEnglishToKorean,
-} from '../../modules/promptside-translation';
+} from '../../modules/cueback-translation';
 
 export function useOnDeviceTranslation() {
   const [translatedText, setTranslatedText] = useState('');

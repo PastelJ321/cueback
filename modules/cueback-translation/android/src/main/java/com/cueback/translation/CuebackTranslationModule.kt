@@ -1,4 +1,4 @@
-package com.promptside.translation
+package com.cueback.translation
 
 import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.nl.translate.TranslateLanguage
@@ -8,9 +8,9 @@ import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
-class PromptsideTranslationModule : Module() {
+class CuebackTranslationModule : Module() {
   override fun definition() = ModuleDefinition {
-    Name("PromptsideTranslation")
+    Name("CuebackTranslation")
 
     Function("isAvailable") {
       true

@@ -1,0 +1,8 @@
+{
+  "name": "cueback-translation",
+  "version": "1.0.0",
+  "description": "Cueback on-device Apple Translation bridge",
+  "main": "index.ts",
+  "private": true,
+  "license": "MIT"
+}

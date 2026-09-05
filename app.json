@@ -1,10 +1,11 @@
 {
   "expo": {
-    "name": "Promptside",
-    "slug": "promptside",
+    "name": "Cueback",
+    "slug": "cueback",
     "version": "1.0.0",
     "orientation": "default",
-    "scheme": "promptside",
+    "scheme": "cueback",
+    "githubUrl": "https://github.com/PastelJ321/cueback",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
@@ -15,10 +16,10 @@
     "ios": {
       "supportsTablet": true,
       "requireFullScreen": false,
-      "bundleIdentifier": "com.promptside.app"
+      "bundleIdentifier": "com.cueback.app"
     },
     "android": {
-      "package": "com.promptside.app",
+      "package": "com.cueback.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -35,8 +36,8 @@
       [
         "expo-speech-recognition",
         {
-          "microphonePermission": "Allow Promptside to hear questions during Live Q&A.",
-          "speechRecognitionPermission": "Allow Promptside to transcribe questions during Live Q&A.",
+          "microphonePermission": "Allow Cueback to hear questions during Live Q&A.",
+          "speechRecognitionPermission": "Allow Cueback to transcribe questions during Live Q&A.",
           "androidSpeechServicePackages": [
             "com.google.android.as",
             "com.google.android.tts",

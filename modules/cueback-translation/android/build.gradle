@@ -1,6 +1,6 @@
 apply plugin: 'com.android.library'
 
-group = 'com.promptside.translation'
+group = 'com.cueback.translation'
 version = '1.0.0'
 
 def expoModulesCorePlugin = new File(project(':expo-modules-core').projectDir.absolutePath, 'ExpoModulesCorePlugin.gradle')
@@ -11,7 +11,7 @@ useExpoPublishing()
 useDefaultAndroidSdkVersions()
 
 android {
-  namespace 'com.promptside.translation'
+  namespace 'com.cueback.translation'
 
   defaultConfig {
     versionCode 1

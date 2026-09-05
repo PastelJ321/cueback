@@ -155,7 +155,7 @@ export function useSpeechRecognition() {
 
     if (__DEV__) {
       console.info(
-        `[Promptside Speech] locale=en-US, onDevice=${supportsOnDevice}, platform=${Platform.OS}`,
+        `[Cueback Speech] locale=en-US, onDevice=${supportsOnDevice}, platform=${Platform.OS}`,
       );
     }
     return supportsOnDevice;

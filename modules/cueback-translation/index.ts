@@ -1,11 +1,11 @@
 import { requireOptionalNativeModule } from 'expo-modules-core';
 
-type PromptsideTranslationNativeModule = {
+type CuebackTranslationNativeModule = {
   isAvailable(): boolean;
   translateEnglishToKorean(text: string): Promise<string>;
 };
 
-const nativeModule = requireOptionalNativeModule<PromptsideTranslationNativeModule>('PromptsideTranslation');
+const nativeModule = requireOptionalNativeModule<CuebackTranslationNativeModule>('CuebackTranslation');
 
 export function isOnDeviceTranslationAvailable(): boolean {
   return nativeModule?.isAvailable() ?? false;

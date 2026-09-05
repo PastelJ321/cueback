@@ -1,8 +1,0 @@
-{
-  "name": "promptside-translation",
-  "version": "1.0.0",
-  "description": "Promptside on-device Apple Translation bridge",
-  "main": "index.ts",
-  "private": true,
-  "license": "MIT"
-}

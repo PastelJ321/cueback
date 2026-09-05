@@ -30,7 +30,7 @@ export function LiveMatchList({
       {matches.length === 0 ? (
         <View style={styles.emptyMatches}>
           <Text style={styles.emptyTitle}>Matches will appear here</Text>
-          <Text style={styles.emptyBody}>Promptside compares meaning only after a final transcript is captured.</Text>
+          <Text style={styles.emptyBody}>Cueback compares meaning only after a final transcript is captured.</Text>
         </View>
       ) : matches.map((item) => (
         <Pressable

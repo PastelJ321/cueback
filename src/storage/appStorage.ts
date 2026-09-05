@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { AppData } from '../types/models';
 
-const STORAGE_KEY = '@promptside/app-data/v1';
+const STORAGE_KEY = '@cueback/app-data/v1';
 
 export const EMPTY_APP_DATA: AppData = {
   version: 1,

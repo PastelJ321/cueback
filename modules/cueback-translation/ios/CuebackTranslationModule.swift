@@ -19,7 +19,7 @@ private final class TranslationFailedException: GenericException<String>, @unche
 }
 
 @available(iOS 18.0, *)
-private struct PromptsideTranslationRunner: View {
+private struct CuebackTranslationRunner: View {
   let sourceText: String
   let completion: (Result<String, Error>) -> Void
 
@@ -40,11 +40,11 @@ private struct PromptsideTranslationRunner: View {
   }
 }
 
-public final class PromptsideTranslationModule: Module {
+public final class CuebackTranslationModule: Module {
   private var translationHosts: [UUID: UIViewController] = [:]
 
   public func definition() -> ModuleDefinition {
-    Name("PromptsideTranslation")
+    Name("CuebackTranslation")
 
     Function("isAvailable") {
       if #available(iOS 18.0, *) { return true }
@@ -69,7 +69,7 @@ public final class PromptsideTranslationModule: Module {
       }
 
       let requestId = UUID()
-      let runner = PromptsideTranslationRunner(sourceText: sourceText) { [weak self] result in
+      let runner = CuebackTranslationRunner(sourceText: sourceText) { [weak self] result in
         guard let self, let host = self.translationHosts.removeValue(forKey: requestId) else { return }
         host.willMove(toParent: nil)
         host.view.removeFromSuperview()

@@ -1,0 +1,10 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["CuebackTranslationModule"],
+    "podspecPath": "CuebackTranslation.podspec"
+  },
+  "android": {
+    "modules": ["com.cueback.translation.CuebackTranslationModule"]
+  }
+}
