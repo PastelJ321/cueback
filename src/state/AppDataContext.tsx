@@ -2,7 +2,7 @@ import {
   createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState,
 } from 'react';
 
-import { createSamplePresentation } from '../data/sampleData';
+import { createSamplePresentation, isReplaceableSamplePresentation } from '../data/sampleData';
 import { SEMANTIC_MODEL_ID } from '../constants/semantic';
 import { hashQuestionText } from '../services/semanticMatching';
 import { EMPTY_APP_DATA, loadAppData, saveAppData } from '../storage/appStorage';
@@ -145,10 +145,21 @@ export function AppDataProvider({ children }: PropsWithChildren) {
 
   const addSamplePresentation = useCallback(async () => {
     const sample = createSamplePresentation();
+    const replacedPresentationIds = new Set(
+      data.presentations
+        .filter((presentation) => isReplaceableSamplePresentation(presentation, data.questions))
+        .map((presentation) => presentation.id),
+    );
     await persist({
       ...data,
-      presentations: [sample.presentation, ...data.presentations],
-      questions: [...sample.questions, ...data.questions],
+      presentations: [
+        sample.presentation,
+        ...data.presentations.filter((item) => !replacedPresentationIds.has(item.id)),
+      ],
+      questions: [
+        ...sample.questions,
+        ...data.questions.filter((item) => !replacedPresentationIds.has(item.presentationId)),
+      ],
     });
     return sample.presentation;
   }, [data, persist]);

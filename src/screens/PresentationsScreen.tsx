@@ -70,7 +70,7 @@ export function PresentationsScreen({ navigation }: Props) {
             <AppButton label="New presentation" onPress={() => setModal({ title: '' })} />
           </View>
         }
-        ListEmptyComponent={<EmptyState title="No presentations yet" body="Create one, or load the sample question bank to try the flow immediately." />}
+        ListEmptyComponent={<EmptyState title="No presentations yet" body="Create one, or load the Wharton rehearsal bank to test the complete Q&A flow." />}
         renderItem={({ item }) => {
           const questionCount = data.questions.filter((q) => q.presentationId === item.id).length;
           return (
@@ -90,7 +90,7 @@ export function PresentationsScreen({ navigation }: Props) {
             </Pressable>
           );
         }}
-        ListFooterComponent={<AppButton disabled={busy} label="Load sample presentation" onPress={() => void addSample()} style={styles.sampleButton} variant="secondary" />}
+        ListFooterComponent={<AppButton disabled={busy} label="Load / refresh Wharton rehearsal" onPress={() => void addSample()} style={styles.sampleButton} variant="secondary" />}
       />
 
       <Modal animationType="fade" onRequestClose={() => setModal(null)} transparent visible={modal !== null}>

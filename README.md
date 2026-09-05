@@ -17,7 +17,7 @@ The iPad landscape Live Q&A screen keeps status, transcript, confidence, possibl
 - Presentation create, rename, select, and delete
 - Expected Question and Answer Script create, edit, and delete
 - AsyncStorage persistence entirely on the device
-- Four-question sample presentation
+- Ten-question 2026–2027 Wharton rehearsal presentation
 - Multilingual MiniLM cosine-similarity matching, Top 3 candidates, confidence guard, and embedding cache
 - Up to three speech-recognition alternatives reranked by semantic similarity
 - English-to-Korean on-device translation on Android and iOS/iPadOS
@@ -137,15 +137,32 @@ Keep the phone unlocked and accept its USB debugging authorization prompt. Re-ru
 
 1. Open Cueback in iPad landscape.
 2. Allow both **Microphone** and **Speech Recognition** permissions.
-3. Tap **Load sample presentation**.
+3. Tap **Load / refresh Wharton rehearsal**. Loading it again replaces only the generated rehearsal bank and preserves user-created presentations.
 4. Open it and tap **Start Live Q&A**.
 5. Wait for `MINILM READY`. The multilingual embedding model downloads once and is cached locally.
-6. Tap **Listen** and say: “What made you decide that this benchmark was suitable?”
+6. Tap **Listen** and say: “What made you avoid fixed income even though this money will eventually fund a new company?”
 7. Confirm the interim transcript updates while speaking.
 8. The first translation can show the operating system's English/Korean language-pack download prompt. Accept it once.
-9. Confirm a final transcript, Korean translation, Top 3 matches, match confidence, and the prepared benchmark Answer Script appear.
-10. Also try: “What factors about the client determined how much risk you were willing to take?”
+9. Confirm a final transcript, Korean translation, Top 3 matches, match confidence, and the prepared bond-allocation Answer Script appear.
+10. Also try: “How did the client's career keep you from making technology a much bigger bet?”
 11. If confidence is too low, verify that the app shows **No confident match** instead of automatically showing an answer.
+
+### Rehearsal paraphrases
+
+These prompts are intentionally not stored in the question bank. Speak them naturally to test whether semantic matching works when both vocabulary and sentence structure differ from the prepared question.
+
+| Speak this test prompt | Expected prepared-question topic |
+| --- | --- |
+| What exactly does this money need to accomplish before the client launches the venture? | Primary investment objective |
+| Given the need to protect seed money, why leave fixed income out entirely? | Excluding bonds |
+| If nearly everything is stocks or cash, what actually prevents a severe loss? | Downside-risk controls |
+| What purpose does parking a quarter of the account on the sidelines serve? | 25 percent cash allocation |
+| Why spread the exposure among those three developed markets? | United States, Japan, and Europe |
+| Didn’t the client’s technology career make a large big-tech bet redundant? | Background and technology sizing |
+| How does owning European medical businesses connect to the founder’s vision? | European healthcare |
+| What makes the American consumer names useful when markets become turbulent? | American consumer companies |
+| How are Japanese manufacturers supposed to cushion the rest of the holdings? | Japanese industrial companies |
+| What do European banks and other financial firms add that was missing? | European financial companies |
 
 ## Apple speech recognition
 

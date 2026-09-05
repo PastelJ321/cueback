@@ -1,6 +1,7 @@
 export type Presentation = {
   id: string;
   title: string;
+  sampleKey?: string;
   createdAt: string;
   updatedAt: string;
 };
