@@ -5,7 +5,11 @@ export function hasProEntitlement(info: CustomerInfo): boolean {
 }
 
 export function isPurchaseCancelled(error: unknown): boolean {
-  return Boolean(error && typeof error === 'object' && 'userCancelled' in error && error.userCancelled === true);
+  return Boolean(error && typeof error === 'object' && (
+    ('userCancelled' in error && error.userCancelled === true)
+    // RevenueCat 10.10.1 PURCHASE_CANCELLED_ERROR is code "1".
+    || ('code' in error && error.code === '1')
+  ));
 }
 
 export function isTestStoreKey(key: string | undefined): boolean {

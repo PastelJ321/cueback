@@ -14,7 +14,11 @@ function loadPureTypeScript(path, dependencies = {}) {
 }
 const { AppDataStore } = loadPureTypeScript('../src/state/appDataStore.ts');
 const { assertCanAddPresentation, assertCanAddQuestion, ProRequiredError } = loadPureTypeScript('../src/state/limits.ts');
-const { createTestStoreInitializer, hasProEntitlement, isPurchaseCancelled, isTestStoreKey } = loadPureTypeScript('../src/state/purchaseRules.ts');
+const purchaseRules = loadPureTypeScript('../src/state/purchaseRules.ts');
+const { createTestStoreInitializer, hasProEntitlement, isPurchaseCancelled, isTestStoreKey } = purchaseRules;
+const { RevenueCatFlow, selectCurrentPackage } = loadPureTypeScript('../src/services/revenueCatFlow.ts', {
+  '../state/purchaseRules': purchaseRules,
+});
 const { LEGACY_STORAGE_KEY, loadStoredAppData, STORAGE_KEY } = loadPureTypeScript('../src/storage/loadStoredAppData.ts');
 
 const empty = () => ({ version: 1, presentations: [], questions: [] });
@@ -68,9 +72,79 @@ test('Pro is derived only from active entitlement; cancellation never grants it'
   assert.equal(hasProEntitlement({ entitlements: { active: {} } }), false);
   assert.equal(hasProEntitlement({ entitlements: { active: { pro: { identifier: 'pro' } } } }), true);
   assert.equal(isPurchaseCancelled({ userCancelled: true }), true);
+  assert.equal(isPurchaseCancelled({ code: '1', userCancelled: null }), true);
   assert.equal(isPurchaseCancelled(new Error('failed')), false);
   assert.equal(isTestStoreKey('test_example'), true);
   assert.equal(isTestStoreKey('appl_example'), false);
+});
+
+test('Current Offering chooses an available monthly package, then a real fallback', () => {
+  const monthly = { identifier: '$rc_monthly', product: { title: 'Monthly', priceString: '$4.99' } };
+  const annual = { identifier: '$rc_annual', product: { title: 'Annual', priceString: '$29.99' } };
+  assert.equal(selectCurrentPackage({ current: { monthly, availablePackages: [annual, monthly] } }), monthly);
+  assert.equal(selectCurrentPackage({ current: { monthly: null, availablePackages: [annual] } }), annual);
+  assert.equal(selectCurrentPackage({ current: { monthly, availablePackages: [annual] } }), annual);
+  assert.throws(() => selectCurrentPackage({ current: null }), /No Current Offering/);
+  assert.throws(() => selectCurrentPackage({ current: { monthly: null, availablePackages: [] } }), /no available packages/);
+});
+
+const customer = (pro) => ({ entitlements: { active: pro ? { pro: { identifier: 'pro' } } : {} } });
+
+test('purchase and restore require the entitlement returned by their SDK calls', async () => {
+  const item = { identifier: '$rc_monthly' };
+  let purchaseInfo = customer(true);
+  let restoreInfo = customer(true);
+  const flow = new RevenueCatFlow({
+    purchasePackage: async () => ({ customerInfo: purchaseInfo }),
+    restorePurchases: async () => restoreInfo,
+  });
+  assert.equal((await flow.purchase(item)).kind, 'granted');
+  purchaseInfo = customer(false);
+  assert.equal((await flow.purchase(item)).kind, 'inactive');
+  assert.equal((await flow.restore()).kind, 'granted');
+  restoreInfo = customer(false);
+  assert.equal((await flow.restore()).kind, 'inactive');
+});
+
+test('cancel and purchase failure do not return a Pro grant', async () => {
+  const item = { identifier: '$rc_monthly' };
+  const cancelled = new RevenueCatFlow({
+    purchasePackage: async () => { throw { code: '1', userCancelled: true }; },
+    restorePurchases: async () => customer(false),
+  });
+  assert.equal((await cancelled.purchase(item)).kind, 'cancelled');
+  const failed = new RevenueCatFlow({
+    purchasePackage: async () => { throw new Error('network'); },
+    restorePurchases: async () => { throw new Error('restore failed'); },
+  });
+  assert.equal((await failed.purchase(item)).kind, 'failed');
+  assert.equal((await failed.restore()).kind, 'failed');
+});
+
+test('one lock blocks duplicate purchase, duplicate restore, and overlapping operations', async () => {
+  let releasePurchase;
+  let releaseRestore;
+  let purchaseCalls = 0;
+  let restoreCalls = 0;
+  const flow = new RevenueCatFlow({
+    purchasePackage: () => { purchaseCalls += 1; return new Promise((resolve) => { releasePurchase = resolve; }); },
+    restorePurchases: () => { restoreCalls += 1; return new Promise((resolve) => { releaseRestore = resolve; }); },
+  });
+  const firstPurchase = flow.purchase({ identifier: '$rc_monthly' });
+  assert.equal(flow.isBusy, true);
+  assert.equal((await flow.purchase({ identifier: '$rc_monthly' })).kind, 'busy');
+  assert.equal((await flow.restore()).kind, 'busy');
+  assert.equal(purchaseCalls, 1);
+  assert.equal(restoreCalls, 0);
+  releasePurchase({ customerInfo: customer(true) });
+  assert.equal((await firstPurchase).kind, 'granted');
+  const firstRestore = flow.restore();
+  assert.equal((await flow.restore()).kind, 'busy');
+  assert.equal((await flow.purchase({ identifier: '$rc_monthly' })).kind, 'busy');
+  assert.equal(restoreCalls, 1);
+  releaseRestore(customer(false));
+  assert.equal((await firstRestore).kind, 'inactive');
+  assert.equal(flow.isBusy, false);
 });
 
 test('Test Store SDK setup accepts only a public test key and runs once', () => {
@@ -80,6 +154,33 @@ test('Test Store SDK setup accepts only a public test key and runs once', () => 
   initialize('test_example');
   initialize('test_example');
   assert.deepEqual(configured, ['test_example']);
+});
+
+test('a failed SDK setup can be retried without marking initialization complete', () => {
+  let attempts = 0;
+  const initialize = createTestStoreInitializer(() => {
+    attempts += 1;
+    if (attempts === 1) throw new Error('native setup failed');
+  });
+  assert.throws(() => initialize('test_example'), /native setup failed/);
+  initialize('test_example');
+  initialize('test_example');
+  assert.equal(attempts, 2);
+});
+
+test('a failed billing operation releases its lock for retry', async () => {
+  let attempts = 0;
+  const flow = new RevenueCatFlow({
+    purchasePackage: async () => {
+      attempts += 1;
+      if (attempts === 1) throw new Error('temporary network failure');
+      return { customerInfo: customer(true) };
+    },
+    restorePurchases: async () => customer(false),
+  });
+  assert.equal((await flow.purchase({ identifier: '$rc_monthly' })).kind, 'failed');
+  assert.equal(flow.isBusy, false);
+  assert.equal((await flow.purchase({ identifier: '$rc_monthly' })).kind, 'granted');
 });
 
 test('legacy data is copied to the current key without deleting the old copy', async () => {
