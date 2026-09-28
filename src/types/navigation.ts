@@ -3,4 +3,5 @@ export type RootStackParamList = {
   QuestionBank: { presentationId: string };
   QuestionEditor: { presentationId: string; questionId?: string };
   LiveQA: { presentationId: string };
+  Pro: undefined;
 };

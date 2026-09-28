@@ -1,8 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { AppData } from '../types/models';
-
-const STORAGE_KEY = '@cueback/app-data/v1';
+import { loadStoredAppData, STORAGE_KEY } from './loadStoredAppData';
 
 export const EMPTY_APP_DATA: AppData = {
   version: 1,
@@ -10,18 +9,11 @@ export const EMPTY_APP_DATA: AppData = {
   questions: [],
 };
 
-function isAppData(value: unknown): value is AppData {
-  if (!value || typeof value !== 'object') return false;
-  const candidate = value as Partial<AppData>;
-  return candidate.version === 1 && Array.isArray(candidate.presentations) && Array.isArray(candidate.questions);
-}
-
 export async function loadAppData(): Promise<AppData> {
-  const raw = await AsyncStorage.getItem(STORAGE_KEY);
-  if (!raw) return EMPTY_APP_DATA;
-  const parsed: unknown = JSON.parse(raw);
-  if (!isAppData(parsed)) throw new Error('The saved data format is not supported.');
-  return parsed;
+  return await loadStoredAppData(
+    (key) => AsyncStorage.getItem(key),
+    (key, value) => AsyncStorage.setItem(key, value),
+  ) ?? EMPTY_APP_DATA;
 }
 
 export async function saveAppData(data: AppData): Promise<void> {

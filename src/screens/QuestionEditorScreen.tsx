@@ -8,6 +8,7 @@ import { LabeledInput } from '../components/LabeledInput';
 import { colors, spacing } from '../constants/theme';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import { useAppData } from '../state/AppDataContext';
+import { ProRequiredError } from '../state/limits';
 import type { RootStackParamList } from '../types/navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'QuestionEditor'>;
@@ -31,6 +32,7 @@ export function QuestionEditorScreen({ navigation, route }: Props) {
       else await createQuestion(route.params.presentationId, { question, answer });
       navigation.goBack();
     } catch (error) {
+      if (error instanceof ProRequiredError) { navigation.navigate('Pro'); return; }
       Alert.alert('Couldn’t save question', error instanceof Error ? error.message : 'Please try again.');
     } finally {
       setSaving(false);

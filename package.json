@@ -7,6 +7,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios --device",
     "typecheck": "tsc --noEmit",
+    "test": "node --test tests/*.test.mjs",
     "lint": "eslint .",
     "check": "npm run typecheck && npm run lint && npx expo install --check"
   },
@@ -26,6 +27,8 @@
     "react-native": "0.83.10",
     "react-native-executorch": "^0.9.3",
     "react-native-executorch-expo-resource-fetcher": "^0.9.1",
+    "react-native-purchases": "^10.10.1",
+    "react-native-purchases-ui": "^10.10.1",
     "react-native-safe-area-context": "~5.6.2",
     "react-native-screens": "~4.23.0"
   },

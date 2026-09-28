@@ -3,13 +3,6 @@ import { createId } from '../utils/id';
 
 export const SAMPLE_PRESENTATION_KEY = 'wharton-2026-2027-v1';
 
-const LEGACY_SAMPLE_QUESTIONS = new Set([
-  'Why did you choose this benchmark?',
-  "How did you assess the client's risk tolerance?",
-  'Why did you invest in technology?',
-  'How is the portfolio diversified?',
-]);
-
 const SAMPLE_ITEMS = [
   {
     question: "What is the client's primary investment objective?",
@@ -57,12 +50,11 @@ export function isReplaceableSamplePresentation(
   presentation: Presentation,
   questions: PreparedQuestion[],
 ): boolean {
-  if (presentation.sampleKey === SAMPLE_PRESENTATION_KEY) return true;
-  if (presentation.title !== 'Wharton Investment Competition') return false;
-
+  if (presentation.sampleKey !== SAMPLE_PRESENTATION_KEY || presentation.title !== '2026–2027 Wharton Investment Competition') return false;
   const presentationQuestions = questions.filter((item) => item.presentationId === presentation.id);
-  return presentationQuestions.length === LEGACY_SAMPLE_QUESTIONS.size
-    && presentationQuestions.every((item) => LEGACY_SAMPLE_QUESTIONS.has(item.question));
+  const expected = SAMPLE_ITEMS.slice(0, presentationQuestions.length);
+  return (presentationQuestions.length === SAMPLE_ITEMS.length || presentationQuestions.length === 5)
+    && presentationQuestions.every((item, index) => item.question === expected[index].question && item.answer === expected[index].answer);
 }
 
 export function createSamplePresentation(): { presentation: Presentation; questions: PreparedQuestion[] } {

@@ -93,7 +93,7 @@ export function LiveQAScreen({ route }: Props) {
               <AppButton label="Retry model" onPress={matcher.retry} style={styles.toolbarButton} variant="secondary" />
             ) : null}
             <AppButton
-              disabled={speech.state === 'requesting' || !matcher.isReady}
+              disabled={speech.state === 'requesting' || speech.state === 'stopping' || (!active && !matcher.isReady)}
               label={listenLabel}
               loading={speech.state === 'requesting'}
               onPress={handleListen}
@@ -103,6 +103,10 @@ export function LiveQAScreen({ route }: Props) {
           </View>
 
           {speech.error ? <Text accessibilityRole="alert" style={styles.wideError}>{speech.error}</Text> : null}
+          {speech.needsOfflineModel ? (
+            <AppButton label="Download English speech pack" onPress={() => void speech.downloadOfflineModel()} variant="secondary" />
+          ) : null}
+          {speech.modelDownloadMessage ? <Text style={styles.wideError}>{speech.modelDownloadMessage}</Text> : null}
           {matcher.matchError ? <Text accessibilityRole="alert" style={styles.wideError}>{matcher.matchError}</Text> : null}
           {matcher.error && !matcher.isReady ? <Text style={styles.wideError}>{matcher.error}</Text> : null}
 
@@ -111,13 +115,15 @@ export function LiveQAScreen({ route }: Props) {
               <View style={styles.transcriptCard}>
                 <Text style={styles.sectionLabel}>DETECTED QUESTION</Text>
                 <AudioLevelMeter active={speech.state === 'listening'} compact level={speech.audioLevel} />
-                <Text style={[styles.wideTranscript, !speech.transcript && styles.placeholderTranscript]}>
-                  {speech.transcript
-                    ? `“${speech.transcript}”`
-                    : active
-                      ? 'Listening for an English question…'
-                      : 'Tap Listen when the question begins.'}
-                </Text>
+                <ScrollView style={styles.wideTranscriptScroll}>
+                  <Text style={[styles.wideTranscript, !speech.transcript && styles.placeholderTranscript]}>
+                    {speech.transcript
+                      ? `“${speech.transcript}”`
+                      : active
+                        ? 'Listening for an English question…'
+                        : 'Tap Listen when the question begins.'}
+                  </Text>
+                </ScrollView>
                 <Text style={styles.transcriptState}>
                   {active
                     ? 'Listening stays active until you tap Stop'
@@ -201,7 +207,7 @@ export function LiveQAScreen({ route }: Props) {
             {speech.transcript ? `“${speech.transcript}”` : 'Tap Listen, then keep the device where it can clearly hear the questioner.'}
           </Text>
           <AppButton
-            disabled={speech.state === 'requesting' || !matcher.isReady}
+            disabled={speech.state === 'requesting' || speech.state === 'stopping' || (!active && !matcher.isReady)}
             label={listenLabel}
             loading={speech.state === 'requesting'}
             onPress={handleListen}
@@ -296,6 +302,7 @@ const styles = StyleSheet.create({
   transcriptCard: { backgroundColor: colors.surface, borderColor: colors.border, borderRadius: radius.md, borderWidth: 1, gap: 12, minHeight: 210, padding: spacing.lg },
   sectionLabel: { color: colors.accent, fontSize: 12, fontWeight: '800', letterSpacing: 1.4 },
   wideTranscript: { color: colors.text, fontSize: 25, fontWeight: '700', lineHeight: 34 },
+  wideTranscriptScroll: { flexGrow: 0, maxHeight: 170 },
   placeholderTranscript: { color: colors.muted, fontWeight: '600' },
   transcriptState: { color: colors.muted, fontSize: 12, marginTop: 'auto', paddingTop: 12 },
   alternateTranscript: { color: colors.accent, fontSize: 12, fontWeight: '600', lineHeight: 18 },

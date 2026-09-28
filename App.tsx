@@ -7,10 +7,12 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { colors } from './src/constants/theme';
 import { LiveQAScreen } from './src/screens/LiveQAScreen';
 import { PresentationsScreen } from './src/screens/PresentationsScreen';
+import { ProScreen } from './src/screens/ProScreen';
 import { QuestionBankScreen } from './src/screens/QuestionBankScreen';
 import { QuestionEditorScreen } from './src/screens/QuestionEditorScreen';
 import { AppDataProvider, useAppData } from './src/state/AppDataContext';
 import { SemanticModelProvider } from './src/state/SemanticModelContext';
+import { PurchasesProvider } from './src/state/PurchasesContext';
 import type { RootStackParamList } from './src/types/navigation';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -69,6 +71,7 @@ function RootNavigator() {
           name="LiveQA"
           options={{ title: 'Live Q&A', headerBackTitle: 'Questions' }}
         />
+        <Stack.Screen component={ProScreen} name="Pro" options={{ title: 'Cueback Pro', presentation: 'modal' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -77,12 +80,14 @@ function RootNavigator() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <SemanticModelProvider>
-        <AppDataProvider>
-          <StatusBar style="dark" />
-          <RootNavigator />
-        </AppDataProvider>
-      </SemanticModelProvider>
+      <PurchasesProvider>
+        <SemanticModelProvider>
+          <AppDataProvider>
+            <StatusBar style="dark" />
+            <RootNavigator />
+          </AppDataProvider>
+        </SemanticModelProvider>
+      </PurchasesProvider>
     </SafeAreaProvider>
   );
 }

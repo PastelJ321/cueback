@@ -8,6 +8,8 @@ import { EmptyState } from '../components/EmptyState';
 import { colors, radius, spacing } from '../constants/theme';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import { useAppData } from '../state/AppDataContext';
+import { usePurchases } from '../state/PurchasesContext';
+import { FREE_QUESTION_LIMIT } from '../state/limits';
 import type { PreparedQuestion } from '../types/models';
 import type { RootStackParamList } from '../types/navigation';
 
@@ -15,6 +17,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'QuestionBank'>;
 
 export function QuestionBankScreen({ navigation, route }: Props) {
   const { data, deleteQuestion } = useAppData();
+  const { isPro } = usePurchases();
   const { isWide } = useResponsiveLayout();
   const presentation = data.presentations.find((item) => item.id === route.params.presentationId);
   const questions = data.questions.filter((item) => item.presentationId === route.params.presentationId);
@@ -42,7 +45,11 @@ export function QuestionBankScreen({ navigation, route }: Props) {
     ]);
   };
 
-  const addQuestion = () => navigation.navigate('QuestionEditor', { presentationId: presentation.id });
+  const addQuestion = () => {
+    if (!isPro && questions.length >= FREE_QUESTION_LIMIT) navigation.navigate('Pro');
+    else navigation.navigate('QuestionEditor', { presentationId: presentation.id });
+  };
+  const addLabel = !isPro && questions.length >= FREE_QUESTION_LIMIT ? 'Get Pro for more' : 'Add question';
   const editQuestion = (question: PreparedQuestion) => navigation.navigate('QuestionEditor', {
     presentationId: presentation.id,
     questionId: question.id,
@@ -59,7 +66,7 @@ export function QuestionBankScreen({ navigation, route }: Props) {
               <Text style={styles.wideHeading}>Review your question bank before going live.</Text>
             </View>
             <View style={styles.wideActions}>
-              <AppButton label="Add question" onPress={addQuestion} style={styles.wideButton} variant="secondary" />
+              <AppButton label={addLabel} onPress={addQuestion} style={styles.wideButton} variant="secondary" />
               <AppButton disabled={questions.length === 0} label="Start Live Q&A" onPress={startLiveQA} style={styles.wideButton} />
             </View>
           </View>
@@ -122,7 +129,7 @@ export function QuestionBankScreen({ navigation, route }: Props) {
           <View style={styles.header}>
             <Text style={styles.count}>{questions.length} PREPARED {questions.length === 1 ? 'QUESTION' : 'QUESTIONS'}</Text>
             <View style={styles.buttonRow}>
-              <AppButton label="Add question" onPress={addQuestion} style={styles.flex} variant="secondary" />
+              <AppButton label={addLabel} onPress={addQuestion} style={styles.flex} variant="secondary" />
               <AppButton disabled={questions.length === 0} label="Start Live Q&A" onPress={startLiveQA} style={styles.flex} />
             </View>
           </View>

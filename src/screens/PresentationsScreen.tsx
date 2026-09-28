@@ -11,6 +11,8 @@ import { LabeledInput } from '../components/LabeledInput';
 import { colors, radius, spacing } from '../constants/theme';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import { useAppData } from '../state/AppDataContext';
+import { usePurchases } from '../state/PurchasesContext';
+import { ProRequiredError } from '../state/limits';
 import type { RootStackParamList } from '../types/navigation';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Presentations'>;
@@ -18,6 +20,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Presentations'>;
 export function PresentationsScreen({ navigation }: Props) {
   const { isWide } = useResponsiveLayout();
   const { data, createPresentation, renamePresentation, deletePresentation, addSamplePresentation } = useAppData();
+  const { isPro } = usePurchases();
   const [modal, setModal] = useState<{ id?: string; title: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -29,6 +32,7 @@ export function PresentationsScreen({ navigation }: Props) {
       else await createPresentation(modal.title);
       setModal(null);
     } catch (error) {
+      if (error instanceof ProRequiredError) { setModal(null); navigation.navigate('Pro'); return; }
       Alert.alert('Couldn’t save', error instanceof Error ? error.message : 'Please try again.');
     } finally {
       setBusy(false);
@@ -47,7 +51,8 @@ export function PresentationsScreen({ navigation }: Props) {
     try {
       const sample = await addSamplePresentation();
       navigation.navigate('QuestionBank', { presentationId: sample.id });
-    } catch {
+    } catch (error) {
+      if (error instanceof ProRequiredError) { navigation.navigate('Pro'); return; }
       Alert.alert('Couldn’t add sample', 'Local storage is unavailable.');
     } finally {
       setBusy(false);
@@ -67,7 +72,8 @@ export function PresentationsScreen({ navigation }: Props) {
           <View style={styles.header}>
             <Text style={styles.eyebrow}>CUEBACK</Text>
             <Text style={styles.title}>Your prepared answers, ready when the question lands.</Text>
-            <AppButton label="New presentation" onPress={() => setModal({ title: '' })} />
+            <AppButton label={isPro || data.presentations.length < 1 ? 'New presentation' : 'Get Pro for more presentations'} onPress={() => isPro || data.presentations.length < 1 ? setModal({ title: '' }) : navigation.navigate('Pro')} />
+            <AppButton label={isPro ? 'Cueback Pro active' : 'Explore Cueback Pro'} onPress={() => navigation.navigate('Pro')} variant="ghost" />
           </View>
         }
         ListEmptyComponent={<EmptyState title="No presentations yet" body="Create one, or load the Wharton rehearsal bank to test the complete Q&A flow." />}
